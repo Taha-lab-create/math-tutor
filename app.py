@@ -2,187 +2,172 @@ import streamlit as st
 import random
 import time
 
-# --- 1. THE DESIGN SYSTEM (HIGH CONTRAST) ---
-st.set_page_config(page_title="Galaxy Academy Pro", layout="wide", initial_sidebar_state="collapsed")
+# --- 1. GLOBAL DESIGN SYSTEM (High-Contrast & Modern) ---
+st.set_page_config(page_title="Math Galaxy Quest", layout="wide", initial_sidebar_state="collapsed")
 
-def apply_pro_styles():
+def inject_styles():
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
+        /* High-Contrast Color Palette */
+        :root {
+            --bg-deep: #020617;
+            --panel-bg: #0f172a;
+            --neon-blue: #38bdf8;
+            --neon-green: #10b981;
+            --error-red: #f43f5e;
+            --text-main: #f8fafc;
+        }
+
+        .stApp { background-color: var(--bg-deep); color: var(--text-main); }
         
-        /* Base Setup */
-        html, body, [class*="st-"] { font-family: 'Outfit', sans-serif; background-color: #020617; }
-        .stApp { background: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%); color: #FFFFFF; }
-
-        /* High-Contrast Input Fields */
-        input[type="text"], input[type="number"] {
-            background-color: #1e293b !important;
-            color: #FFFFFF !important;
-            border: 2px solid #38bdf8 !important;
-            border-radius: 12px !important;
-            padding: 10px !important;
-            font-size: 20px !important;
-        }
-
-        /* The Main Mission Card */
-        .mission-card {
-            background: rgba(15, 23, 42, 0.95);
-            border: 3px solid #38bdf8;
-            border-radius: 40px;
-            padding: 50px;
+        /* Mission Card styling from your reference guide */
+        .mission-container {
+            background: var(--panel-bg);
+            border: 2px solid var(--neon-blue);
+            border-radius: 24px;
+            padding: 40px;
             text-align: center;
-            box-shadow: 0 0 50px rgba(56, 189, 248, 0.2);
-            margin: 20px auto;
+            box-shadow: 0 0 40px rgba(56, 189, 248, 0.15);
+            margin-top: 20px;
         }
 
-        /* Success/Progress Banner */
-        .success-banner {
-            background: linear-gradient(90deg, #065f46, #059669);
-            color: white;
-            padding: 20px;
-            border-radius: 20px;
-            border: 2px solid #10b981;
-            margin-bottom: 20px;
-            animation: pulse 2s infinite;
-        }
-
-        /* Orb Grid for Visual Counting (Age 4-5) */
-        .orb-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin: 40px 0; }
-        .orb { 
-            width: 70px; height: 70px; border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #38bdf8, #1e40af);
-            box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
-            border: 3px solid #FFFFFF;
-        }
-
-        /* Navigation Buttons */
-        .stButton>button {
-            background: #10b981 !important; /* High Visibility Green */
-            color: white !important;
+        /* Input Field Fix: High contrast white text on dark navy background */
+        .stTextInput input, .stNumberInput input {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 2px solid var(--neon-blue) !important;
             font-size: 24px !important;
-            font-weight: 900 !important;
-            height: 70px !important;
-            border-radius: 20px !important;
-            box-shadow: 0 8px 0 #047857;
-            transition: all 0.1s;
+            height: 60px !important;
         }
-        .stButton>button:active { transform: translateY(4px); box-shadow: 0 2px 0 #047857; }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
+        /* Big Green 'Check Answer' Button */
+        .stButton>button {
+            background-color: var(--neon-green) !important;
+            color: white !important;
+            font-weight: 800 !important;
+            font-size: 22px !important;
+            height: 70px !important;
+            width: 100% !important;
+            border-radius: 16px !important;
+            border: none !important;
+            box-shadow: 0 6px 0 #047857 !important;
+            transition: 0.1s;
+        }
+        .stButton>button:active { transform: translateY(4px); box-shadow: 0 2px 0 #047857 !important; }
+
+        /* HUD Styling */
+        .hud-label { color: var(--neon-blue); font-weight: 700; font-size: 14px; text-transform: uppercase; }
+        .hud-value { color: #ffffff; font-size: 28px; font-weight: 900; }
+
+        /* Orb Grid for Ages 3-5 */
+        .orb { 
+            width: 60px; height: 60px; border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #38bdf8, #1e40af);
+            display: inline-block; margin: 10px;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
         }
         </style>
     """, unsafe_allow_html=True)
 
-# --- 2. GAME ENGINE MODULES ---
-def generate_level_data(age, level):
-    """Syllabus Logic: Defines the problem based on developmental stage."""
+# --- 2. ENGINE & STATE MANAGEMENT ---
+if 'initialized' not in st.session_state:
+    st.session_state.update({
+        'initialized': True,
+        'phase': 'START', # START, PLAY, REWARD
+        'hero_name': '',
+        'hero_age': 4,
+        'level': 1,
+        'xp': 0,
+        'current_q': None,
+        'current_a': 0,
+        'attempts': 0
+    })
+
+def get_new_question():
+    age = st.session_state.hero_age
+    lvl = st.session_state.level
     if age <= 5:
-        # One-to-one correspondence mode (Counting)
-        target = random.randint(2, 6 + level)
-        return {"mode": "count", "val": target, "text": "Count the Space Orbs!"}
+        target = random.randint(1, 5 + lvl)
+        st.session_state.current_q = "count"
+        st.session_state.current_a = target
     else:
-        # Arithmetic mode
-        ops = ['+'] if level < 3 else ['+', '-']
-        op = random.choice(ops)
-        n1 = random.randint(level, level + 10)
-        n2 = random.randint(1, 10)
-        if op == '-': n1, n2 = max(n1, n2), min(n1, n2)
-        return {"mode": "math", "val": eval(f"{n1}{op}{n2}"), "text": f"{n1} {op} {n2}"}
+        num1 = random.randint(1, 5 * lvl)
+        num2 = random.randint(1, 5)
+        st.session_state.current_q = f"{num1} + {num2}"
+        st.session_state.current_a = num1 + num2
 
-def initialize_session():
-    if 'app_state' not in st.session_state:
-        st.session_state.update({
-            'phase': 'ONBOARDING',
-            'user_name': '',
-            'user_age': 4,
-            'current_level': 1,
-            'xp': 0,
-            'quest': None,
-            'feedback_msg': '',
-            'history': []
-        })
+# --- 3. UI RENDERING PHASES ---
+inject_styles()
 
-# --- 3. THE PHASE RENDERER ---
-def render_onboarding():
-    _, col, _ = st.columns([1, 1.8, 1])
-    with col:
-        st.markdown("<div class='mission-card'>", unsafe_allow_html=True)
-        st.title("👨‍🚀 GALAXY ACADEMY")
-        name = st.text_input("HERO NAME", placeholder="Type your name here...")
-        age = st.select_slider("YOUR AGE", options=list(range(3, 13)), value=4)
-        
-        if st.button("LAUNCH MISSION 🚀"):
-            if name.strip():
-                st.session_state.user_name = name
-                st.session_state.user_age = age
-                st.session_state.quest = generate_level_data(age, 1)
-                st.session_state.phase = 'EXERCISE'
+# HUD (Only visible after onboarding)
+if st.session_state.phase != 'START':
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c1: st.markdown(f"<p class='hud-label'>Hero</p><p class='hud-value'>{st.session_state.hero_name}</p>", unsafe_allow_html=True)
+    with c2: st.progress(st.session_state.xp / 100, text=f"Rank: Level {st.session_state.level}")
+    with c3: st.markdown(f"<p class='hud-label'>XP Points</p><p class='hud-value'>{st.session_state.xp}</p>", unsafe_allow_html=True)
+
+# PHASE: ONBOARDING
+if st.session_state.phase == 'START':
+    _, mid, _ = st.columns([1, 1.5, 1])
+    with mid:
+        st.markdown("<div class='mission-container'>", unsafe_allow_html=True)
+        st.title("🚀 GALAXY ACADEMY")
+        name = st.text_input("Enter Hero Name:", key="onboard_name")
+        age = st.select_slider("Hero Age:", options=list(range(3, 13)), value=5)
+        if st.button("INITIALIZE SYSTEMS 🛰️"):
+            if name:
+                st.session_state.hero_name = name
+                st.session_state.hero_age = age
+                get_new_question()
+                st.session_state.phase = 'PLAY'
                 st.rerun()
             else:
-                st.error("Wait! We need your name to start the rocket!")
+                st.error("Commander, we need your name to begin!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-def render_exercise():
-    # HUD Bar
-    h1, h2, h3 = st.columns([1, 2, 1])
-    h1.metric("HERO", st.session_state.user_name)
-    h2.progress(st.session_state.xp / 100, text=f"Level {st.session_state.current_level} Progress")
-    h3.metric("XP", st.session_state.xp)
-
+# PHASE: THE EXERCISE (Main Loop)
+elif st.session_state.phase == 'PLAY':
     _, mid, _ = st.columns([1, 2, 1])
     with mid:
-        q = st.session_state.quest
-        st.markdown(f"<div class='mission-card'><h2>{q['text']}</h2>", unsafe_allow_html=True)
+        st.markdown("<div class='mission-container'>", unsafe_allow_html=True)
         
-        if q['mode'] == "count":
-            st.markdown('<div class="orb-grid">' + ('<div class="orb"></div>' * q['val']) + '</div>', unsafe_allow_html=True)
+        # Display Question
+        if st.session_state.current_q == "count":
+            st.subheader("How many Star-Orbs can you find?")
+            st.markdown("".join(['<div class="orb"></div>' for _ in range(st.session_state.current_a)]), unsafe_allow_html=True)
         else:
-            st.markdown(f"<h1 style='font-size:100px; color:#38bdf8;'>{q['text']}</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h1 style='font-size: 80px;'>{st.session_state.current_q}</h1>", unsafe_allow_html=True)
 
-        with st.form(key=f"input_form_{st.session_state.xp}", clear_on_submit=True):
-            ans = st.number_input("ANSWER", step=1, value=None, label_visibility="collapsed")
-            if st.form_submit_button("CHECK MY ANSWER! ✅"):
-                if ans == q['val']:
-                    st.session_state.phase = 'FEEDBACK'
+        # Interaction Form
+        with st.form(key=f"math_form_{st.session_state.xp}"):
+            ans = st.number_input("Your Answer", step=1, value=None, label_visibility="collapsed")
+            submit = st.form_submit_button("CHECK ANSWER 🚀")
+            
+            if submit:
+                if ans == st.session_state.current_a:
+                    st.session_state.phase = 'REWARD'
                     st.rerun()
                 else:
-                    st.error(f"Oops! Let's try that again, {st.session_state.user_name}!")
+                    st.error("Almost! Recalibrate and try again, Hero!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-def render_feedback():
-    _, col, _ = st.columns([1, 1.5, 1])
-    with col:
+# PHASE: REWARD / FEEDBACK LOOP
+elif st.session_state.phase == 'REWARD':
+    _, mid, _ = st.columns([1, 1.5, 1])
+    with mid:
         st.balloons()
         st.markdown(f"""
-            <div class='success-banner'>
-                <h1 style='text-align:center;'>OUTSTANDING, {st.session_state.user_name.upper()}!</h1>
+            <div class='mission-container' style='border-color: #10b981;'>
+                <h1 style='color: #10b981;'>EXCELLENT WORK, {st.session_state.hero_name.upper()}!</h1>
+                <p style='font-size: 20px;'>The mission was a success. +20 XP awarded.</p>
             </div>
-            <div class='mission-card'>
-                <p style='font-size:24px;'>You've mastered this quest!</p>
-                <h3>+25 XP Gained</h3>
         """, unsafe_allow_html=True)
         
         if st.button("NEXT MISSION ➡️"):
-            st.session_state.xp += 25
+            st.session_state.xp += 20
             if st.session_state.xp >= 100:
-                st.session_state.current_level += 1
+                st.session_state.level += 1
                 st.session_state.xp = 0
-            
-            st.session_state.quest = generate_level_data(st.session_state.user_age, st.session_state.current_level)
-            st.session_state.phase = 'EXERCISE'
+            get_new_question()
+            st.session_state.phase = 'PLAY'
             st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# --- 4. EXECUTION ---
-initialize_session()
-apply_pro_styles()
-
-if st.session_state.phase == 'ONBOARDING':
-    render_onboarding()
-elif st.session_state.phase == 'EXERCISE':
-    render_exercise()
-elif st.session_state.phase == 'FEEDBACK':
-    render_feedback()
